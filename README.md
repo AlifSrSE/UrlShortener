@@ -2,138 +2,174 @@
 
 # URL Shortener
 
-A simple Laravel-based URL shortener service that converts long URLs into short, user-friendly URLs. This service includes a frontend interface for ease of use and ensures proper redirection from the short URL to the original URL.
+A Laravel-based URL shortener service that converts long URLs into short, shareable links with analytics, custom aliases, expiration, password protection, and QR code generation.
 
 ---
 
-## **Features**
-- **Shorten Long URLs:** Converts any valid long URL into a short, unique URL.
-- **Redirection:** Automatically redirects users from the short URL to the original long URL.
-- **Frontend Interface:** User-friendly form to input and generate short URLs.
-- **Error Handling:** Handles invalid URLs and prevents duplicate short codes.
-- **Security Measures:** Validates input URLs to prevent open redirects and malicious links.
-- **Rate Limiting:** Prevents abuse by limiting the number of short URLs generated per user.
+## Features
+
+- **Shorten Long URLs** — Converts any valid long URL into a short, unique URL.
+- **Custom Aliases** — Users can choose their own short code (e.g., `/my-link`).
+- **URL Expiration** — Set optional expiration dates for short URLs.
+- **Password Protection** — Protect short URLs with a password.
+- **Click Analytics** — Tracks IP, user agent, referrer, and timestamp for every click.
+- **QR Code Generation** — Generates QR codes for any short URL.
+- **Bulk Shortening API** — Shorten up to 10 URLs in a single API request.
+- **Rate Limiting** — Prevents abuse with throttling on the web form.
+- **Security Headers** — X-Frame-Options, HSTS, CSP, and more.
+- **Responsive UI** — Tailwind CSS with AJAX form submission, copy button, and loading states.
 
 ---
 
-## **Technical Details**
+## Technical Details
 
-### **Database Schema**
-The project uses a MySQL database to store URL mappings:
-- **`id`**: Auto-incrementing primary key.
-- **`original_url`**: The original long URL (stored as `TEXT` to support very long URLs).
-- **`short_code`**: A unique 6-character code for the short URL.
-- **Timestamps**: Tracks creation and update times.
+### Database Schema
 
-### **Key Considerations**
-- **Uniqueness:** Ensures short URLs are unique with a retry mechanism.
-- **Validation:** Validates input URLs using Laravel's `validate` method.
-- **Short URL Length:** Fixed at 6 characters but configurable for future scalability.
+- **`short_urls`**: Stores URL mappings
+  - `id` — Auto-incrementing primary key
+  - `original_url` — The original long URL (TEXT)
+  - `short_code` — Auto-generated 6-character code
+  - `alias` — Optional custom alias (unique, nullable)
+  - `password` — Optional hashed password (nullable)
+  - `expires_at` — Optional expiration timestamp (nullable)
+  - `timestamps` — Creation and update times
+
+- **`clicks`**: Stores click analytics
+  - `id` — Auto-incrementing primary key
+  - `short_url_id` — Foreign key to short_urls
+  - `ip_address` — Visitor IP address
+  - `user_agent` — Browser user agent
+  - `referrer` — HTTP referrer
+  - `country` — Country code (nullable)
+  - `clicked_at` — Timestamp of the click
+  - `timestamps`
+
+### Key Considerations
+- **Uniqueness:** Ensures short URLs and aliases are unique.
+- **Validation:** Validates input URLs, aliases, and expiration dates.
+- **Caching:** Redirect lookups are cached for performance.
 
 ---
 
-## **Installation**
+## Installation
 
-Follow these steps to set up the project locally:
+### 1. Clone the Repository
+```bash
+git clone https://github.com/VOID-ALIF/url-shortener.git
+cd url-shortener
+```
 
-### **1. Clone the Repository**
-    ```bash
-    git clone https://github.com/VOID-ALIF/url-shortener.git
-    cd url-shortener
+### 2. Install Dependencies
+```bash
+composer install
+```
 
+### 3. Configure Environment
+```bash
+cp .env.example .env
+php artisan key:generate
+```
 
-## 2. Install Dependencies
+Update the database settings in `.env`:
+```bash
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=url_shortener
+DB_USERNAME=root
+DB_PASSWORD=yourpassword
+```
 
-- Install Laravel dependencies using Composer:
-    ```bash
-        composer install
+### 4. Run Migrations
+```bash
+php artisan migrate
+```
 
-## 3. Configure Environment
+### 5. Start the Server
+```bash
+php artisan serve
+```
 
-- Create a **`.env`** file based on **`.env.example`**:
-    ```bash
-        cp .env.example .env
-- Update the database settings in **`.env`**
-    ```bash
-        DB_CONNECTION=mysql
-        DB_HOST=127.0.0.1
-        DB_PORT=3306
-        DB_DATABASE=url_shortener
-        DB_USERNAME=root
-        DB_PASSWORD=yourpassword
+The app will be accessible at **`http://127.0.0.1:8000`**.
 
-## 4. Generate Application Key
-
-- Run the following command to generate the app key:
-    ```bash
-        php artisan key:generate
-
-## 5. Run Database Migrations
-
-- Setup the database schema:
-    ```bash
-        php artisan migrate
-  
-## 6. Start the Server
-
-- Launch the Laravel development server:
-    ```bash
-        php artisan serve
-The app will be accessible at **`http://127.0.0.01:8000`**.
+---
 
 ## Usage
 
-Frontend
-1. Open the application in your browser at **`https://127.0.0.01:8000`**.
-2. Enter a valid long URL in the input field and click "Shorten".
-3. The generated short URL will be displayed and clicking it will redirect to the original URL.
+### Web Interface
+1. Open the application in your browser at **`http://127.0.0.1:8000`**.
+2. Enter a valid long URL in the input field.
+3. Optionally set a custom alias, expiration date, or password.
+4. Click **Shorten URL**.
+5. Copy the short URL or download the QR code.
 
-## API Endpoints
+### API Endpoints
 
-- Create Short URL
-  - Method: **`POST`**
-  - Endpoint: **`/shorten`**
-  - Payload:
-    ```bash
-    {
-       "url": "https://example.com/dfkuvghduyfkjUGBNWJNFiuyewfkjbw0845tjsndvkgv"
-    }
-   - Response:
-     ```bash
-     {
-       "short_url": "https://127.0.0.1:8000/abc123"
-     }
-- Redirect
-  - Method: **`GET`**
-  - Endpoint: **`/abc123`**
-  - Redirects to the original long URL
+All API endpoints require an `X-API-Key` header.
 
-## Project Structure
+#### Create Short URL
+- Method: **`POST`**
+- Endpoint: **`/api/shorten`**
+- Headers: `X-API-Key: your-api-key`
+- Payload:
+  ```json
+  {
+    "url": "https://example.com/very-long-url",
+    "alias": "my-link",
+    "expires_at": "2026-09-01T12:00",
+    "password": "secret123"
+  }
+  ```
+- Response:
+  ```json
+  {
+    "short_url": "http://127.0.0.1:8000/my-link"
+  }
+  ```
 
-- Frontend: Blade template at **`resources/views/shortener.blade.php`**
-- Controller: URL shortening logic in **`app/Http/Controller/UrlShortenerController.php`**
-- Model: ShortUrl model in **`app/Models/ShortUrl.php`**
-- Routes: Defined in **`routes/web.php`**
-- Database Migration: Located in **`database/migrations`**
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+#### Bulk Shorten URLs
+- Method: **`POST`**
+- Endpoint: **`/api/shorten/bulk`**
+- Headers: `X-API-Key: your-api-key`
+- Payload:
+  ```json
+  {
+    "urls": [
+      "https://example1.com",
+      "https://example2.com"
+    ]
+  }
+  ```
+- Response:
+  ```json
+  {
+    "data": [
+      {"original_url": "https://example1.com", "short_url": "http://127.0.0.1:8000/abc123"},
+      {"original_url": "https://example2.com", "short_url": "http://127.0.0.1:8000/def456"}
+    ]
+  }
+  ```
 
-## Contributing
+#### Redirect
+- Method: **`GET`**
+- Endpoint: **`/{code}`**
+- Redirects to the original long URL (410 if expired)
 
-Contributions are welcome! Feel free to open issues or submit pull requests. Reach out to me if needed to at [alif.rahman.c@gmail.com](mailto:alif.rahman.c@gmail.com).
+#### QR Code
+- Method: **`GET`**
+- Endpoint: **`/qr/{code}`**
+- Redirects to a generated QR code image
 
-## Local Setup for Contribution
+---
 
-- Fork the repository.
-- Clone your forked repository:
-    ```bash
-       git clone https://github.com/VOID-ALIF/url-shortener.git
-- Create a new branch:
-     ```bash
-        git checkout -b feature-branch-name
-- Make your changes and test throughly.
-- Push the branch and open a pull request.
+## Running Tests
 
+```bash
+php artisan test
+```
+
+---
 
 ## License
 
-This project is licensed under the [MIT license](https://opensource.org/licenses/MIT). See the LICENSE file for details.
+This project is licensed under the [MIT license](https://opensource.org/licenses/MIT).
